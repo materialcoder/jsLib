@@ -316,63 +316,39 @@ Base.prototype = {
 		return this;
 	},
 
-	//设置动画
+	//设置动画,最多可以传入三个参数，第一个参数为属性变化对象，如果有两个参数，第二个可以为动画执行结束后的操作，也可以为动画运行速度，
+	//如果有三个参数，则第二个必须为动画执行结束后的操作，第三个参数为动画运行速度
 	animate: function(obj) {
 		for(var i=0;i<this.elements.length;i++) {
+			var fn = null;
+			var velocity = '';
 			var element = this.elements[i];
-			
-			var attr = obj['attr'] != undefined ? obj['attr'] : 'left'; //可选，不传默认为left
-			var start = obj['start'] != undefined ? obj['start'] :
-						attr=='opacity' ? parseFloat(getStyle(element,attr))*100 : parseInt(getStyle(element,attr)); //可选，默认为CSS的起始位置
-			var time = obj['time'] != undefined ? obj['time'] : 20; //可选，默认每20毫秒执行一次
-			var step = obj['step'] != undefined ? obj['step'] : 20; //可选，默认每次移动20px
-			
-			var alter = obj['alter'];
-			var target = obj['target'];
-			var mul = obj['mul']; //同步动画
-			if(mul == undefined) {
-				mul = {};
-				mul[attr] = target;
+			if(arguments[1] != undefined) {
+				if(typeof arguments[1] == 'function') {
+					fn = arguments[1];
+				} else if(typeof arguments[1] == 'string') {
+					velocity = arguments[1];
+				}
 			}
-
-
-			if(alter != undefined && target == undefined) {
-				target = obj['alter'] + start;
-			} else if(alter == undefined && target == undefined && mul == undefined) {
-				throw new Error('alter增量和target目标量必须填一个');
+			if (arguments[1] != undefined && arguments[2] != undefined) {
+				fn = arguments[1];
+				velocity = arguments[2];
 			}
-
-			//var target = obj['alter'] + start;  //必选，增量，运行的目标点
 			
-			var speed = obj['speed'] != undefined ? obj['speed'] : 6; //可选，默认缓冲速度为6
+			var time = 30 ;  //可选，默认每30毫秒执行一次
+			
+			var speed = velocity == '' ? 6 : velocity == 'slow' ? 10 : 3; //可选，默认缓冲速度为6
 			var type = obj['type'] == 0 ? 'constant' : obj[type] == 1 ? 'buffer' : 'buffer'; //可选，0表示匀速，1表示缓冲，默认缓冲
-
-			if(attr == 'opacity') {
-				element.style.opacity = start/100;
-			} else {
-				element.style[attr] = start + 'px';
-			}
-
-			if(start > target) {
-				step = -step;
-			}
+			
 			clearInterval(element.timer); //避免点击或其他事件触发动画时速度累加,同时为了避免多个动画冲突导致中断，给每个动画开一个定时器
 			element.timer = setInterval(function() {
-
-				/*
-					问题1：多个动画执行了多个队列动画，要求不管多少个动画只执行一个队列动画
-					问题2：多个动画数值差别太大时，导致动画无法执行到目标值，原因是定时器提前清理掉
-					
-					解决1：不管多少个动画，只提供一次队列动画的机会
-					解决2：多个动画按最后一个分动画执行完毕后再清理即可
-				*/
 			
 				//创建一个布尔值，用于判断多个动画是否全部执行完毕
 				var flag = true; //表示都执行完毕了
 
-				for(var i in mul) {
+				for(var i in obj) {
 					attr = i;
-					target = mul[i];
+					target = obj[i];
 
 
 					if(type == 'buffer') {
@@ -413,8 +389,8 @@ Base.prototype = {
 				}
 				if(flag) {
 					clearInterval(element.timer);
-					if(obj.fn) {
-						obj.fn();
+					if(fn) {
+						fn();
 					}
 				}
 			}, time);
