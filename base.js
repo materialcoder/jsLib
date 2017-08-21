@@ -324,14 +324,21 @@ Base.prototype = {
 			var attr = obj['attr'] != undefined ? obj['attr'] : 'left'; //可选，不传默认为left
 			var start = obj['start'] != undefined ? obj['start'] :
 						attr=='opacity' ? parseFloat(getStyle(element,attr))*100 : parseInt(getStyle(element,attr)); //可选，默认为CSS的起始位置
-			var time = obj['time'] != undefined ? obj['time'] : 50; //可选，默认每50毫秒执行一次
-			var step = obj['step'] != undefined ? obj['step'] : 10; //可选，默认每次移动10px
+			var time = obj['time'] != undefined ? obj['time'] : 20; //可选，默认每20毫秒执行一次
+			var step = obj['step'] != undefined ? obj['step'] : 20; //可选，默认每次移动20px
 			
 			var alter = obj['alter'];
 			var target = obj['target'];
+			var mul = obj['mul']; //同步动画
+			if(mul == undefined) {
+				mul = {};
+				mul[attr] = target;
+			}
+
+
 			if(alter != undefined && target == undefined) {
 				target = obj['alter'] + start;
-			} else if(alter == undefined && target == undefined) {
+			} else if(alter == undefined && target == undefined && mul == undefined) {
 				throw new Error('alter增量和target目标量必须填一个');
 			}
 
@@ -349,46 +356,76 @@ Base.prototype = {
 			if(start > target) {
 				step = -step;
 			}
-			clearInterval(window.timer); //避免点击或其他事件触发动画时速度累加
-			timer = setInterval(function() {
-				if(type == 'buffer') {
-					step = attr=='opacity' ? (target - parseFloat(getStyle(element,attr))*100)/speed : 
-						   (target - parseInt(getStyle(element,attr)))/speed;
-					step = step>0 ? Math.ceil(step):Math.floor(step);
-				}
-				if(attr == 'opacity') {
-					if(step==0) {
-						setOpacity();
-					} else if(step > 0 && Math.abs(parseFloat(getStyle(element,attr))*100 - target) <= step) {
-						setOpacity();
-					} else if(step < 0 && (parseFloat(getStyle(element,attr))*100 - target) <= Math.abs(step)) {
-						setOpacity();
-					} else {
-						var temp = parseFloat(getStyle(element,attr)) *100;
-						element.style.opacity = parseInt(temp + step) /100;
-					}
-				} else {
-					if(step==0) {
-						setTarget();
-					} else if(step > 0 && Math.abs(parseInt(getStyle(element,attr)) - target) <= step) {
-						setTarget();
-					} else if(step < 0 && (parseInt(getStyle(element,attr)) - target) <= Math.abs(step)) {
-						setTarget();
-					} else {
-						element.style[attr] = parseInt(getStyle(element,attr))+step+"px";
-					}
-				}
-				
-				function setTarget() {
-					element.style[attr] = target + 'px';
-					clearInterval(timer);
-				}
+			clearInterval(element.timer); //避免点击或其他事件触发动画时速度累加,同时为了避免多个动画冲突导致中断，给每个动画开一个定时器
+			element.timer = setInterval(function() {
 
-				function setOpacity() {
-					element.style.opacity = parseInt(target)/100;
-					clearInterval(timer);
+				/*
+					问题1：多个动画执行了多个队列动画，要求不管多少个动画只执行一个队列动画
+					问题2：多个动画数值差别太大时，导致动画无法执行到目标值，原因是定时器提前清理掉
+					
+					解决1：不管多少个动画，只提供一次队列动画的机会
+					解决2：多个动画按最后一个分动画执行完毕后再清理即可
+				*/
+			
+				//创建一个布尔值，用于判断多个动画是否全部执行完毕
+				var flag = true; //表示都执行完毕了
+
+				for(var i in mul) {
+					attr = i;
+					target = mul[i];
+
+
+					if(type == 'buffer') {
+						step = attr=='opacity' ? (target - parseFloat(getStyle(element,attr))*100)/speed : 
+							   (target - parseInt(getStyle(element,attr)))/speed;
+						step = step>0 ? Math.ceil(step):Math.floor(step);
+					}
+					if(attr == 'opacity') {
+						if(step==0) {
+							setOpacity();
+						} else if(step > 0 && Math.abs(parseFloat(getStyle(element,attr))*100 - target) <= step) {
+							setOpacity();
+						} else if(step < 0 && (parseFloat(getStyle(element,attr))*100 - target) <= Math.abs(step)) {
+							setOpacity();
+						} else {
+							var temp = parseFloat(getStyle(element,attr)) *100;
+							element.style.opacity = parseInt(temp + step) /100;
+						}
+
+						if(parseInt(target) != parseInt(parseFloat(getStyle(element,attr))*100)) {
+							flag = false;
+						}
+					} else {
+						if(step==0) {
+							setTarget();
+						} else if(step > 0 && Math.abs(parseInt(getStyle(element,attr)) - target) <= step) {
+							setTarget();
+						} else if(step < 0 && (parseInt(getStyle(element,attr)) - target) <= Math.abs(step)) {
+							setTarget();
+						} else {
+							element.style[attr] = parseInt(getStyle(element,attr))+step+"px";
+						}
+
+						if(parseInt(target) != parseInt(getStyle(element,attr))) {
+							flag = false;
+						}
+					}
+				}
+				if(flag) {
+					clearInterval(element.timer);
+					if(obj.fn) {
+						obj.fn();
+					}
 				}
 			}, time);
+
+			function setTarget() {
+				element.style[attr] = target + 'px';
+			}
+
+			function setOpacity() {
+				element.style.opacity = parseInt(target)/100;
+			}
 		}
 		return this;
 	}
