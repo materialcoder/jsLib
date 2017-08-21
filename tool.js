@@ -169,11 +169,13 @@ function getInner() {
 
 //跨浏览器获取style
 function getStyle(element, attr) {
+	var value;
 	if(typeof window.getComputedStyle != 'undefined') { //W3C
-		return window.getComputedStyle(element,null)[attr];
+		value = window.getComputedStyle(element,null)[attr];
 	} else if(typeof element.currentStyle != 'undefined') {  //IE
-		return element.currentStyle[attr];
+		value = element.currentStyle[attr];
 	}
+	return value;
 }
 
 //判断class是否存在

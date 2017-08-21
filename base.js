@@ -314,6 +314,83 @@ Base.prototype = {
 			})
 		}
 		return this;
+	},
+
+	//设置动画
+	animate: function(obj) {
+		for(var i=0;i<this.elements.length;i++) {
+			var element = this.elements[i];
+			
+			var attr = obj['attr'] != undefined ? obj['attr'] : 'left'; //可选，不传默认为left
+			var start = obj['start'] != undefined ? obj['start'] :
+						attr=='opacity' ? parseFloat(getStyle(element,attr))*100 : parseInt(getStyle(element,attr)); //可选，默认为CSS的起始位置
+			var time = obj['time'] != undefined ? obj['time'] : 50; //可选，默认每50毫秒执行一次
+			var step = obj['step'] != undefined ? obj['step'] : 10; //可选，默认每次移动10px
+			
+			var alter = obj['alter'];
+			var target = obj['target'];
+			if(alter != undefined && target == undefined) {
+				target = obj['alter'] + start;
+			} else if(alter == undefined && target == undefined) {
+				throw new Error('alter增量和target目标量必须填一个');
+			}
+
+			//var target = obj['alter'] + start;  //必选，增量，运行的目标点
+			
+			var speed = obj['speed'] != undefined ? obj['speed'] : 6; //可选，默认缓冲速度为6
+			var type = obj['type'] == 0 ? 'constant' : obj[type] == 1 ? 'buffer' : 'buffer'; //可选，0表示匀速，1表示缓冲，默认缓冲
+
+			if(attr == 'opacity') {
+				element.style.opacity = start/100;
+			} else {
+				element.style[attr] = start + 'px';
+			}
+
+			if(start > target) {
+				step = -step;
+			}
+			clearInterval(window.timer); //避免点击或其他事件触发动画时速度累加
+			timer = setInterval(function() {
+				if(type == 'buffer') {
+					step = attr=='opacity' ? (target - parseFloat(getStyle(element,attr))*100)/speed : 
+						   (target - parseInt(getStyle(element,attr)))/speed;
+					step = step>0 ? Math.ceil(step):Math.floor(step);
+				}
+				if(attr == 'opacity') {
+					if(step==0) {
+						setOpacity();
+					} else if(step > 0 && Math.abs(parseFloat(getStyle(element,attr))*100 - target) <= step) {
+						setOpacity();
+					} else if(step < 0 && (parseFloat(getStyle(element,attr))*100 - target) <= Math.abs(step)) {
+						setOpacity();
+					} else {
+						var temp = parseFloat(getStyle(element,attr)) *100;
+						element.style.opacity = parseInt(temp + step) /100;
+					}
+				} else {
+					if(step==0) {
+						setTarget();
+					} else if(step > 0 && Math.abs(parseInt(getStyle(element,attr)) - target) <= step) {
+						setTarget();
+					} else if(step < 0 && (parseInt(getStyle(element,attr)) - target) <= Math.abs(step)) {
+						setTarget();
+					} else {
+						element.style[attr] = parseInt(getStyle(element,attr))+step+"px";
+					}
+				}
+				
+				function setTarget() {
+					element.style[attr] = target + 'px';
+					clearInterval(timer);
+				}
+
+				function setOpacity() {
+					element.style.opacity = parseInt(target)/100;
+					clearInterval(timer);
+				}
+			}, time);
+		}
+		return this;
 	}
 	
 }
